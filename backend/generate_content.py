@@ -3,7 +3,7 @@ from langchain import OpenAI
 from langchain.callbacks import get_openai_callback
 from langchain.prompts import PromptTemplate
  
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = "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"
  
  
 flashcards_pt = """
@@ -50,7 +50,7 @@ def get_flashcards_from_textbook(textbook):
 
 def get_test_from_textbook(textbook):
     with get_openai_callback() as cb:
-        openai = OpenAI(max_tokens=1000)
+        openai = OpenAI(max_tokens=2000)
         PROMPT = PromptTemplate.from_template(template=test_pt)
         response = openai(PROMPT.format(context=textbook))
         print(cb)

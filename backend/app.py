@@ -22,7 +22,7 @@ from generate_content import get_flashcards_from_textbook, get_test_from_textboo
 
 
 app = Flask(__name__)
-app.config["MONGO_URI"] = os.environ["MONGO_URI"]
+app.config["MONGO_URI"] = "mongodb+srv://kethan:uqhXFu7j9NrlXL5c@dev.z4grark.mongodb.net/?retryWrites=true&w=majority"
 mongo = PyMongo(app)
 db = mongo.cx["dev"]
 CORS(app)
@@ -61,14 +61,30 @@ def register():
 
 # Adds a pratice test to course of user.
 @app.route("/add-practice-test", methods=["POST"])
-def add_practice_test():
+def add_test():
     email = request.json["email"]
     course = request.json["course"]
-    test = json.loads(request.json["test"])
-
-    db.flashcards.insert_one({"email": email, "course": course, "test": test})
+    question = request.json["question"]
+    a = request.json["a"]
+    b = request.json["b"]
+    c = request.json["c"]
+    real = request.json["real"]
+    print("hi")
+    db.tests.insert_one(
+        {
+            "email": email,
+            "question": question,
+            "a": a,
+            "b": b,
+            "c": c,
+            "real": real,
+            "course": course,
+            "bin": 1,
+            "last_reviewed": "",
+        }
+    )
+    print('work')
     return jsonify({"message": "success"})
-
 
 # Adds flashcards to user's course.
 @app.route("/add-flashcard", methods=["POST"])
@@ -114,21 +130,28 @@ def flashcard_last_reviewed():
     email = request.json["email"]
     course = request.json["course"]
     question = request.json["question"]
-    last_reviewed = parser.parse(int(request.json["last_reviewed"]))
-
+    last_reviewed = request.json["last_reviewed"]
+    
     db.flashcards.update_one(
         {"email": email, "question": question, "course": course},
         {"$set": {"last_reviewed": last_reviewed}},
     )
 
-    db.days_reviewed.insert_one({
-        "date": last_reviewed,
-        "email": email,
-    })
+    db.days_reviewed.update_one(
+        {"email": email}, {"$set": {"date": last_reviewed}}, upsert=True
+        )
 
     return jsonify({"message": "success"})
 
+@app.route("/get-days-reviewed", methods=["POST"])
+def get_days_reviewed():
+    email = request.json["email"]
 
+    return jsonify(
+        json.loads(
+            json_util.dumps(db.days_reviewed.find({"email": email}))
+        )
+    )
 
 # Returns flashcards for a given course.
 @app.route("/get-flashcards", methods=["POST"])
@@ -136,10 +159,20 @@ def get_flashcards():
     print(request.json)
     email = request.json["email"]
     course = request.json["course"]
-
     return jsonify(
         json.loads(
             json_util.dumps(db.flashcards.find({"email": email, "course": course}))
+        )
+    )
+
+@app.route("/get-test", methods=["POST"])
+def get_tests():
+    print(request.json)
+    email = request.json["email"]
+    course = request.json["course"]
+    return jsonify(
+        json.loads(
+            json_util.dumps(db.tests.find({"email": email, "course": course}))
         )
     )
 
@@ -230,9 +263,13 @@ def read_pdf():
             textbook = pytesseract.image_to_string(Image.fromarray(gray))
             flashcards = get_flashcards_from_textbook(textbook)
             test = get_test_from_textbook(textbook)
+            print(test)
             # test_dict = {"email": }
             # db.practice_tests.insert_one(test)
-            return jsonify(flashcards)
+            return jsonify({
+                "flashcards": json.loads(flashcards),
+                "test": json.loads(test)
+            })
             # reader = easyocr.Reader(['en'])
             # result = reader.readtext(file.read(), detail=0)
             # print(result)
@@ -265,8 +302,13 @@ def read_pdf():
                         bold_words.append(word[3:-4])
 
             textbook = str(text)
-            result = get_flashcards_from_textbook(textbook)
-            return jsonify(result)
+            flashcards = get_flashcards_from_textbook(textbook)
+            test = get_test_from_textbook(textbook)
+
+            return jsonify({
+                "flashcards": json.loads(flashcards),
+                "test": json.loads(test)
+            })
     except Exception as e:
         print(e)
         return str(e)

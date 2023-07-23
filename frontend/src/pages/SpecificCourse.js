@@ -12,6 +12,7 @@ function Courses() {
   let { course } = useParams();
 
   const [flashcards, setFlashcards] = useState([]);
+  const [tests, setTests] = useState([]);
   const [flip, setFlip] = useState(false);
   const [finished, setFinished] = useState(false);
   const [index, setIndex] = useState(1);
@@ -22,23 +23,38 @@ function Courses() {
 
   const [testDate, setTestDate] = useState();
   const [newTestDate, setNewTestDate] = useState();
+  const [isLoading, setIsLoading] = useState(true);
 
 
   useEffect(() => {
     if (course == undefined) {
       return;
     };
-
+    
+    setIsLoading(true);
     setTestDate(null);
     setNewTestDate(null);
     setIndex(1);
+  
 
     axios.post("http://localhost:8000/get-flashcards", {
       email: localStorage.getItem("email"),
       course: course,
     }).then(e => {
       setFlashcards(e.data);
+      console.log(e.data)
+      console.log(course)
     });
+
+    axios.post("http://localhost:8000/get-test", {
+      email: localStorage.getItem("email"),
+      course: course,
+    }).then(e => {
+      setTests(e.data)
+      console.log("course")
+    });
+
+
 
     axios.post("http://localhost:8000/get-test-date", {
       email: localStorage.getItem("email"),
@@ -46,8 +62,9 @@ function Courses() {
     }).then(e => {
       try {
         if (e.data[0].test_date)
-          setTestDate((new Date(e.data[0].test_date)).toLocaleDateString("en-US", {"timeZone": "UTC"}))
+          setTestDate((new Date(e.data[0].test_date)).toLocaleDateString("en-US", {"timeZone": "UTC"}));
       } catch {console.log("no date")}
+      setIsLoading(false);
     });
   }, [course]);
 
@@ -99,8 +116,9 @@ function Courses() {
       }).then((response) => {
         console.log(response);
         console.log(response.data);
-        let responseDataParsed = JSON.parse(response.data);
-        for (const questionAndAnswer of responseDataParsed) {
+        let responseDataParsed = response.data;
+        console.log(responseDataParsed.flashcards);
+        for (const questionAndAnswer of responseDataParsed.flashcards) {
           console.log(questionAndAnswer);
           axios.post("http://localhost:8000/add-flashcard", {
             email: localStorage.getItem("email"),
@@ -108,11 +126,35 @@ function Courses() {
             question: questionAndAnswer.q,
             answer: questionAndAnswer.a,
           }).then(e => { });
+
         }
+        for (const questionAndAnswers of responseDataParsed.test) {
+          console.log(questionAndAnswers);
+          axios.post("http://localhost:8000/add-practice-test", {
+            email: localStorage.getItem("email"),
+            course: course,
+            question: questionAndAnswers.q,
+            a: questionAndAnswers.a,
+            b: questionAndAnswers.b,
+            c: questionAndAnswers.c,
+            real: questionAndAnswers.real,
+          }).then(e => {
+            console.log(e);
+            window.location.reload();
+          });
+
+        }
+        
         setFlashcards([responseDataParsed]);
         setFetchingData(false);
+
+
       });
     }
+  }
+
+  if (isLoading){
+    return(<></>)
   }
 
   return (
@@ -144,19 +186,19 @@ function Courses() {
             {index === 0 ?
               <>
                 <label id="styled_file_input_ui"
-                  className="flex justify-center w-7/12 h-32 px-4 transition bg-white dark:bg-slate-800 border-2 border-gray-300 border-dashed rounded-2xl appearance-none cursor-pointer hover:border-gray-400 focus:outline-none"
+                  className="flex justify-center w-7/12 h-32 px-4 transition bg-gray-200 border-2 border-gray-300 border-dashed rounded-2xl appearance-none cursor-pointer hover:border-gray-400 focus:outline-none"
                   onDragOver={e => e.preventDefault()} onDrop={e => e.preventDefault()} onChange={e => {
                     setFiles(e.target.files);
                   }}>
                   <div className="flex items-center justify-center flex-col space-x-2 space-y-2">
-                    <span className="flex items-center text-gray-600 dark:text-white">
+                    <span className="flex items-center text-gray-600">
                       <span className="material-symbols-outlined w-6 h-6">cloud_upload</span>
                       <span className="font-medium">
                         Drop a file to attach, or&nbsp;
                         <span className="text-blue-600 underline">browse</span>
                       </span>
                     </span>
-                    <p className="dark:text-white font-medium text-base" id="file_display_area">{files.length === 0 ? "No file chosen" : files[0].name}</p>
+                    <p className="font-medium text-base" id="file_display_area">{files.length === 0 ? "No file chosen" : files[0].name}</p>
                   </div>
                   <input type="file" name="file_upload" className="hidden" accept="application/pdf,image/*" />
                 </label>
@@ -208,9 +250,52 @@ function Courses() {
             {index === 2 ?
               <div className="Course-selection-div">
                 <div className="Subtitle">
-                  Practice test here!
+                  
+                  {tests.map((question, i) => {
+                    return <>
+                      {i +1}. {question.question.toString()}
+                      
+                      <form class="MC">
+                          <input type="radio" name={question.question.toString()}/>
+                          <label className="pl-5">{question.a.toString()}</label>
+                          <br/>
+                          <input type="radio" name={question.question.toString()} />
+                          <label className="pl-5">{question.b.toString()}</label>
+                          <br />
+                          <input type="radio" name={question.question.toString()} />
+                          <label className="pl-5">{question.c.toString()}</label>
+                      </form>
+                      <br />
+                      </>
+                  })}
+                  
+                  <button className="btn btn-primary" onClick={() => {
+                    let MCs = document.getElementsByClassName('MC');
+                    var correct = 0;
+                    for (let i = 0; i < tests.length; i++) {
+                      // console.log(MCs[i].children);
+                      let translate = {
+                        0: "a",
+                        3: "b",
+                        6: "c"
+                      }
+                      for (let x = 0; x < MCs[i].children.length; x += 3) {
+                        
+                        if (MCs[i].children[x].checked && tests[i].real == translate[x]) {
+                          correct += 1;
+                        }
+
+                      }
+                      
+                    }
+                    alert("You got " + correct.toString() + " correct");
+                  }}>
+                    submit
+                  </button>
                 </div>
+              
               </div>
+
               : null}
           </div>
         </div>

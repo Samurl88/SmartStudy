@@ -5,6 +5,7 @@ import ReactCardFlip from "react-card-flip";
 import axios from 'axios';
 import 'material-symbols';
 import "./courses.css";
+import dayjs from "dayjs";
 
 function StudySession() {
   const [courses, setCourses] = useState(null);
@@ -13,6 +14,50 @@ function StudySession() {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [flip, setFlip] = useState(false);
   const [finished, setFinished] = useState(false);
+
+  // Filters flashcard based on bin level.
+  function filterFlashcards(flashcards) {
+    let unfilteredFlashcards = flashcards
+    let filteredFlashcards = []
+    // let date = dayjs(new Date().setUTCHours(0, 0, 0, 0))
+
+    // Today (UTC)
+    // let date = dayjs(new Date("Jul 22 2023 17:00:00 GMT-0700 (Pacific Daylight Time)"))
+    // console.log(date)
+
+    // Tomorrow (UTC)
+    // let date = dayjs(new Date("Jul 23 2023 17:00:00 GMT-0700 (Pacific Daylight Time)"))
+
+    // Next Week (UTC)
+    let date = dayjs(new Date("Jul 29 2023 17:00:00 GMT-0700 (Pacific Daylight Time)"))
+
+    unfilteredFlashcards.forEach((flashcard) => {
+        if (flashcard.bin === 1) {
+            filteredFlashcards.push(flashcard);
+        } else if (flashcard.bin === 2) {
+            console.log(date.diff(dayjs(flashcard.last_reviewed), "day"))
+            if (date.diff(dayjs(flashcard.last_reviewed), "day") >= 1) {
+                filteredFlashcards.push(flashcard);
+            }
+        } else if (flashcard.bin === 3) {
+            console.log(date.diff(dayjs(flashcard.last_reviewed), "day"))
+            if (date.diff(dayjs(flashcard.last_reviewed), "day") >= 7) {
+                filteredFlashcards.push(flashcard);
+            }
+        } else {
+            console.log("Error?!?!?")
+        }
+    })
+    console.log(filteredFlashcards);
+    setFlashcards(filteredFlashcards)
+    
+    
+  }
+
+//   useEffect(() => {
+//     if(flashcards)
+//         filterFlashcards()
+//   }, [flashcards])
 
   useEffect(() => {
     axios.post("http://localhost:8000/get-courses", {
@@ -29,9 +74,23 @@ function StudySession() {
       email: localStorage.getItem("email"),
       course: courses[currentCourseIndex].course,
     }).then(e => {
-      setFlashcards(e.data);
+      filterFlashcards(e.data);
     });
   }, [courses]);
+
+
+  function getNextCourseFlashcards() {
+    console.log(courses[currentCourseIndex + 1].course)
+    setCurrentCardIndex(0);
+    axios.post("http://localhost:8000/get-flashcards", {
+        email: localStorage.getItem("email"),
+        course: courses[currentCourseIndex + 1].course,
+      }).then(e => {
+        console.log(e.data);
+        setCurrentCourseIndex(currentCourseIndex + 1)
+        filterFlashcards(e.data);
+      });
+  }
 
   function getNextFlashcard() {
     setCurrentCardIndex(currentCardIndex + 1);
@@ -69,11 +128,23 @@ function StudySession() {
   }
 
   function setLastReviewed(question) {
+    var day = new Date().setUTCHours(0, 0, 0, 0)
+
+    // Today (UTC)
+    // let day = dayjs(new Date("Jul 22 2023 17:00:00 GMT-0700 (Pacific Daylight Time)")).toDate()
+    // console.log(date)
+
+    // Tomorrow (UTC)
+    // let day = dayjs(new Date("Jul 23 2023 17:00:00 GMT-0700 (Pacific Daylight Time)")).toDate()
+
+    // Next Week (UTC)
+    // let day = dayjs(new Date("Jul 29 2023 17:00:00 GMT-0700 (Pacific Daylight Time)")).toDate()
+    
     axios.post("http://localhost:8000/flashcard-last-reviewed", {
       email: localStorage.getItem("email"),
       course: courses[currentCourseIndex].course,
       question: question,
-      last_reviewed: new Date().toISOString()
+      last_reviewed: new Date(day)
     });
   }
 
@@ -103,7 +174,6 @@ function StudySession() {
                     </summary>
                     <ul className="text-xl text-primary-content p-2 bg-primary">
                       <li><button className="btn-primary">Skip Class</button></li>
-                      {/* <li><button>Skip Class</button></li> */}
                     </ul>
                   </details>
                 </li>
@@ -115,23 +185,26 @@ function StudySession() {
               <div className="flex flex-col items-center content-center justify-center">
                 <CircularProgress />
               </div> :
-              currentCardIndex == flashcards.length ? <div className="text-center">
-                <p>You have finished studying this class!</p>
-                <p>Would you like to move onto the next one?</p>
+              currentCardIndex == flashcards.length ? <div className="text-center flex flex-col justify-center items-center">
+                <p class="text-3xl font-bold mb-5">🎉 You have finished studying for this class! 🎉</p>
                 <div className="flex flex-row items-center gap-5">
-                  <button className="btn btn-primary" variant="contained" color="primary"><span className="material-symbols-outlined">done</span>Yes</button>
+                {currentCourseIndex != courses.length - 1
+                ? <button onClick={() => getNextCourseFlashcards()} className="btn btn-primary" variant="contained" color="primary"><span className="material-symbols-outlined">done</span>Move Onto Next Class!</button>
+
+                : null
+                }
                   <Link to="/mycourses"><button className="btn btn-primary" variant="contained" color="primary"><span className="material-symbols-outlined">keyboard_return</span>Go Back to My Courses</button></Link>
                 </div>
               </div> : <>
                 <ReactCardFlip containerClassName="w-full" isFlipped={flip}
                   flipDirection="vertical">
-                  <div onClick={() => setFlip(!flip)} className="flex flex-col items-center content-center justify-center">
+                  <div onClick={() => setFlip(!flip)}  className="flex flex-col items-center content-center justify-center">
                     <div className="text-center rounded-3xl px-4 w-1/2 bg-gray-100 h-60 shadow-xl flex flex-col items-center content-center justify-center">
                       <p className="text-2xl">Question</p>
                       {flashcards[currentCardIndex].question}
                     </div>
                   </div>
-                  <div onClick={() => setFlip(!flip)} className="flex flex-col items-center content-center justify-center">
+                  <div className="flex flex-col items-center content-center justify-center">
                     <div className="text-center rounded-3xl w-1/2 px-4 bg-gray-100 h-60 shadow-xl flex flex-col items-center content-center justify-center">
                       <p className="text-2xl">Answer</p>
                       {flip ? flashcards[currentCardIndex].answer: ""}
