@@ -8,3 +8,5 @@ python-dateutil
 gunicorn
 pytesseract
 python-dotenv
+langchain
+langchain[llms]
