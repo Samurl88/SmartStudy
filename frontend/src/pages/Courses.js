@@ -22,10 +22,9 @@ function Courses() {
   // Gets days (as Date objects) of current week.
   useEffect(() => {
     const daysList = []
-    var startOfWeek = dayjs().startOf("week");
-    for (var i = 0; i < 7; i++) {
-      var day = startOfWeek.day(i).toDate();
-      daysList.push(day);
+    let startOfWeek = dayjs().startOf("week");
+    for (let i = 0; i < 7; i++) {
+      daysList.push(startOfWeek.day(i).toDate());
     }
     setDays(daysList);
     console.log(days);

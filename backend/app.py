@@ -8,6 +8,7 @@ import numpy as np
 import pytesseract
 from PIL import Image
 from bson import json_util
+from dateutil import parser
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_pymongo import PyMongo
@@ -82,7 +83,7 @@ def add_flashcard():
             "answer": answer,
             "course": course,
             "bin": 1,
-            "times_reviewed": [],
+            "last_reviewed": "",
         }
     )
     return jsonify({"message": "success"})
@@ -111,12 +112,17 @@ def flashcard_last_reviewed():
     email = request.json["email"]
     course = request.json["course"]
     question = request.json["question"]
-    last_reviewed = request.json["last_reviewed"]
+    last_reviewed = parser.parse(int(request.json["last_reviewed"]))
 
     db.flashcards.update_one(
         {"email": email, "question": question, "course": course},
-        {"$push": {"times_reviewed": last_reviewed}},
+        {"$set": {"last_reviewed": last_reviewed}},
     )
+
+    db.days_reviewed.insert_one({
+        "date": last_reviewed,
+        "email": email,
+    })
 
     return jsonify({"message": "success"})
 
@@ -136,29 +142,15 @@ def get_flashcards():
 
 
 # Returns flashcards reviewed on date.
-@app.route("/reviewed-on", methods=["POST"])
+@app.route("/flashcards-reviewed-on", methods=["POST"])
 def reviewed_on():
     email = request.json["email"]
-    date = request.json["date"]
+    date = parser.parse(request.json["date"])
 
-    print(datetime.datetime.utcfromtimestamp(int(date)))
+    if db.days_reviewed.find_one({"email": email, "date": date}):
+        return True
 
-    return jsonify(
-        json.loads(
-            json_util.dumps(
-                db.flashcards.find(
-                    {
-                        "email": email,
-                        "times_reviewed": {
-                            "$elemMatch": {
-                                "$gte": datetime.datetime.utcfromtimestamp(int(date))
-                            }
-                        },
-                    }
-                )
-            )
-        )
-    )
+    return False
 
 
 # Creates a course for a user.

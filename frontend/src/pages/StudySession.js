@@ -73,7 +73,7 @@ function StudySession() {
       email: localStorage.getItem("email"),
       course: courses[currentCourseIndex].course,
       question: question,
-      last_reviewed: Date.now()
+      last_reviewed: new Date().toISOString()
     });
   }
 
