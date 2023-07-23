@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import 'material-symbols';
+import CircularProgress from '@mui/material/CircularProgress';
 import "./courses.css";
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -9,7 +10,9 @@ function Courses() {
   const [courseName, setCourseName] = useState("");
   const [courses, setCourses] = useState([]);
   const [days, setDays] = useState();
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Get courses.
   useEffect(() => {
     axios.post("http://localhost:8000/get-courses", {
       "email": localStorage.getItem('email')
@@ -19,23 +22,55 @@ function Courses() {
     })
   }, []);
 
-  // Gets days (as Date objects) of current week.
   useEffect(() => {
-    const daysList = []
-    var startOfWeek = dayjs().startOf("week");
-    for (var i = 0; i < 7; i++) {
-      var day = startOfWeek.day(i).toDate();
-      daysList.push(day);
+    if(courses) {
+      const daysList = []
+      // var startOfWeek = dayjs().startOf("week")
+      var startOfWeek = dayjs("Sun Jul 21 2023 00:00:00 GMT-0700 (Pacific Daylight Time)");
+      console.log(startOfWeek)
+      for (var i = 0; i < 7; i++) {
+        // var day = startOfWeek.day(i).toDate();
+        var day = startOfWeek.add(i, "day").toDate();
+        var tests = []
+        // Check if test is on day.
+        courses.forEach((course, i) => {
+          if (new Date(course.test_date).toLocaleDateString("en-US", {"timeZone": "UTC"}) == day.toLocaleDateString("en-US", {"timeZone": "UTC"})) {
+            tests.push(course.course);            
+          }
+
+        })
+        var info = {};
+        info[day] = tests;
+        daysList.push(info);
+      }
+  
+      setDays(daysList);
+      console.log(days);
+      setIsLoading(false);
     }
-    setDays(daysList);
-    console.log(days);
-
-  }, []);
+  }, [courses])
 
 
-  if (!days){
+  // // Gets days (as Date objects) of current week.
+  // useEffect(() => {
+  //   const daysList = []
+  //   var startOfWeek = dayjs().startOf("week");
+  //   for (var i = 0; i < 7; i++) {
+  //     var day = startOfWeek.day(i).toDate();
+  //     daysList.push(day);
+  //   }
+
+  //   setDays(daysList);
+  //   console.log(days);
+
+  // }, []);
+
+
+  if (isLoading){
     return(
-      <>Div</>
+      <div class="flex items-center justify-center h-screen">
+        <CircularProgress />
+      </div>
     )
   } else {
   return (
@@ -52,10 +87,24 @@ function Courses() {
           <li className="step" data-content="">{getDay(6)}<br /><br /></li> */}
 
           {days.map((day) => 
-            <li className={"step " + 
-              (day.setHours(0, 0, 0, 0) == (new Date).setHours(0, 0, 0, 0) ? "step-accent" : "step-primary")
+            <li data-content="" className={"step " + 
+              // If today, turn step accent
+              (new Date(Object.keys(day)[0]).setHours(0, 0, 0, 0) == (new Date).setHours(0, 0, 0, 0) 
+              ? "step-accent" 
+              // If yesterday, turn step primary (will need to add check for if completed)
+              : new Date(Object.keys(day)[0]).setHours(0, 0, 0, 0) < (new Date).setHours(0, 0, 0, 0)
+                ? "step-primary"
+                : day[Object.keys(day)[0]][0]
+                  ? "step-error"
+                  : ""
+              )
             }>
-              {Number(String(day.getMonth() + 1).padStart(2, '0')) + '/' + Number(String(day.getDate()).padStart(2, '0'))}
+              {Number(String((new Date(Object.keys(day)[0])).getMonth() + 1).padStart(2, '0')) + '/' + Number(String((new Date(Object.keys(day)[0])).getDate()).padStart(2, '0'))}
+              {day[Object.keys(day)[0]][0] 
+              ? <div>{day[Object.keys(day)[0]]} Test</div>
+              : <div><br/></div>
+              }
+          
             </li>
           )}
         </ul>

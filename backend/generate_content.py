@@ -3,7 +3,7 @@ from langchain import OpenAI
 from langchain.callbacks import get_openai_callback
 from langchain.prompts import PromptTemplate
  
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = "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"
  
  
 flashcards_pt = """

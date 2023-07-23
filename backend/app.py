@@ -3,6 +3,7 @@ import json
 import datetime
 
 from bson import json_util
+from dateutil import parser
 import PyPDF2
 import openai
 from dotenv import load_dotenv
@@ -75,7 +76,16 @@ def add_flashcard():
     question = request.json["question"]
     answer = request.json["answer"]
 
-    db.flashcards.insert_one({"email": email, "question": question, "answer": answer, "course": course, "bin": 1, "times_reviewed": []})
+    db.flashcards.insert_one(
+        {
+            "email": email,
+            "question": question,
+            "answer": answer,
+            "course": course,
+            "bin": 1,
+            "last_reviewed": "",
+        }
+    )
     return jsonify({"message": "success"})
 
 
@@ -99,11 +109,20 @@ def flashcard_last_reviewed():
     email = request.json["email"]
     course = request.json["course"]
     question = request.json["question"]
-    last_reviewed = request.json["last_reviewed"]
+    last_reviewed = parser.parse(int(request.json["last_reviewed"]))
 
-    db.flashcards.update_one({"email": email, "question": question, "course": course}, {"$push": {"times_reviewed": last_reviewed}})
+    db.flashcards.update_one(
+        {"email": email, "question": question, "course": course},
+        {"$set": {"last_reviewed": last_reviewed}},
+    )
+
+    db.days_reviewed.insert_one({
+        "date": last_reviewed,
+        "email": email,
+    })
 
     return jsonify({"message": "success"})
+
 
 
 # Returns flashcards for a given course.
@@ -117,14 +136,15 @@ def get_flashcards():
 
 
 # Returns flashcards reviewed on date.
-@app.route("/reviewed-on", methods=["POST"])
+@app.route("/flashcards-reviewed-on", methods=["POST"])
 def reviewed_on():
     email = request.json["email"]
-    date = request.json["date"]
+    date = parser.parse(request.json["date"])
 
-    print(datetime.datetime.utcfromtimestamp(int(date)))
+    if db.days_reviewed.find_one({"email": email, "date": date}):
+        return True
 
-    return jsonify(json.loads(json_util.dumps(db.flashcards.find({"email": email, "times_reviewed": {"$elemMatch": {"$gte": datetime.datetime.utcfromtimestamp(int(date))}}}))))
+    return False
 
 
 # Creates a course for a user.
@@ -156,7 +176,17 @@ def delete_course():
 
     return jsonify({"message": "success"})
 
-# 
+
+# Gets course's test date, if available.
+@app.route('/get-test-date', methods=["POST"])
+def get_test_date():
+    email = request.json["email"]
+    course = request.json["course"]
+
+    return jsonify(json.loads(json_util.dumps(db.courses.find({"email": email, "course": course}))))
+
+
+# Updates course's test date.
 @app.route('/update-test-date', methods=["POST"])
 def update_test_date():
     email = request.json["email"]

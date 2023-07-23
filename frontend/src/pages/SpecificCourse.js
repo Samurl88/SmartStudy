@@ -23,33 +23,46 @@ function Courses() {
   const [testDate, setTestDate] = useState();
   const [newTestDate, setNewTestDate] = useState();
 
+
   useEffect(() => {
     if (course == undefined) {
       return;
     };
+
+    setTestDate(null);
+    setNewTestDate(null);
+    setIndex(1);
+
     axios.post("http://localhost:8000/get-flashcards", {
       email: localStorage.getItem("email"),
       course: course,
     }).then(e => {
       setFlashcards(e.data);
     });
+
+    axios.post("http://localhost:8000/get-test-date", {
+      email: localStorage.getItem("email"),
+      course: course,
+    }).then(e => {
+      try {
+        if (e.data[0].test_date)
+          setTestDate((new Date(e.data[0].test_date)).toLocaleDateString("en-US", {"timeZone": "UTC"}))
+      } catch {console.log("no date")}
+    });
   }, [course]);
 
-  // Checks if testDate exists in DB. If so, makes sure date has not passed.
-  useEffect(() => {
-
-  }, []);
 
 
   function updateTestDate() {
     if (newTestDate) {
+      console.log(newTestDate)
       axios.post("http://localhost:8000/update-test-date", {
         email: localStorage.getItem("email"),
         course: course,
-        newTestDate: new Date(newTestDate),
+        newTestDate: new Date(newTestDate).toUTCString(),
       }).then(e => {
-        setTestDate((new Date(newTestDate)).toLocaleDateString("en-US"));
-        console.log(testDate)
+        setTestDate((new Date(newTestDate)).toLocaleDateString("en-US", {"timeZone": "UTC"}));
+        console.log("Done!")
       });
     }
   }
@@ -110,12 +123,14 @@ function Courses() {
           
           <div className="flex space-x-3 items-center pb-8">
             <div className="text-2xl">Your next test date:</div>
-
-            <div className="join">
-              <input onChange={evt => setNewTestDate(evt.target.value)} value={ newTestDate } type="date" placeholder="Enter Date" className="text-2xl input input-sm input-bordered join-item"/>
-              <button onClick={() => updateTestDate()} class="btn btn-primary btn-sm join-item">Save</button>
-            </div>
-
+            {testDate ? 
+              <div className="text-2xl">{testDate}</div>
+              :
+              <div className="join">
+                <input onChange={evt => setNewTestDate(evt.target.value)} value={ newTestDate } type="date" placeholder="Enter Date" className="text-2xl input input-sm input-bordered join-item"/>
+                <button onClick={() => updateTestDate()} class="btn btn-primary btn-sm join-item">Save</button>
+              </div>
+            }
           </div>
 
           <div className="flex flex-row self-center">
