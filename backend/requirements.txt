@@ -1,0 +1,7 @@
+numpy
+opencv-python
+pypdf2
+flask
+flask-cors
+flask-pymongo
+python-dateutil

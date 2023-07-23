@@ -5,20 +5,21 @@ import datetime
 from bson import json_util
 from dateutil import parser
 import PyPDF2
-import openai
+import cv2
+import numpy as np
+import pytesseract
+from PIL import Image
+from bson import json_util
+from dateutil import parser
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, request, jsonify
 from flask_pymongo import PyMongo
 from flask_cors import CORS
 
-from PIL import Image
-import pytesseract
-import cv2
-import numpy as np
+load_dotenv()
+
 from generate_content import get_flashcards_from_textbook, get_test_from_textbook
 
-
-load_dotenv()
 
 app = Flask(__name__)
 app.config["MONGO_URI"] = os.environ["MONGO_URI"]
@@ -26,8 +27,9 @@ mongo = PyMongo(app)
 db = mongo.cx["dev"]
 CORS(app)
 
+
 # Returns "hi". Quintessential feature of program.
-@app.route('/')
+@app.route("/")
 def index():
     return "hi"
 
@@ -52,7 +54,7 @@ def register():
 
     if db.users.find_one({"email": email}):
         return jsonify({"message": "user already exists"})
-    
+
     db.users.insert_one({"email": email, "password": password})
     return jsonify({"message": "success"})
 
@@ -95,9 +97,12 @@ def move_flashcard_to_bin():
     email = request.json["email"]
     course = request.json["course"]
     question = request.json["question"]
-    bin = int(request.json["bin"])
+    new_bin = int(request.json["bin"])
 
-    db.flashcards.update_one({"email": email, "question": question, "course": course}, {"$set": {"bin": bin}})
+    db.flashcards.update_one(
+        {"email": email, "question": question, "course": course},
+        {"$set": {"bin": new_bin}},
+    )
 
     return jsonify({"message": "success"})
 
@@ -132,7 +137,11 @@ def get_flashcards():
     email = request.json["email"]
     course = request.json["course"]
 
-    return jsonify(json.loads(json_util.dumps(db.flashcards.find({"email": email, "course": course}))))
+    return jsonify(
+        json.loads(
+            json_util.dumps(db.flashcards.find({"email": email, "course": course}))
+        )
+    )
 
 
 # Returns flashcards reviewed on date.
@@ -170,7 +179,7 @@ def get_courses():
 def delete_course():
     email = request.json["email"]
     course = request.json["course"]
-    
+
     db.courses.delete_one({"email": email, "course": course})
     db.flashcards.delete_many({"email": email, "course": course})
 
@@ -193,27 +202,28 @@ def update_test_date():
     course = request.json["course"]
     date = request.json["newTestDate"]
 
-    db.courses.update_one({"email": email, "course": course}, {"$set": {"test_date": date}})
+    db.courses.update_one(
+        {"email": email, "course": course}, {"$set": {"test_date": date}}
+    )
 
     return jsonify({"message": "success"})
 
-    
 
 # Read upload file. Returns flashcards.
-@app.route('/read', methods=['POST', 'GET'])
+@app.route("/read", methods=["POST", "GET"])
 def read_pdf():
     # Get the uploaded PDF file
-    try: 
-        print(request.files['file'])
-        if 'pdf' not in str(request.files['file']):
-            file = request.files['file'].read()
-            
+    try:
+        print(request.files["file"])
+        if "pdf" not in str(request.files["file"]):
+            file = request.files["file"].read()
+
             nparr = np.frombuffer(file, np.uint8)
             image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            #convert to grayscale image
+            # convert to grayscale image
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-            #checking whether thresh or blur]
+            # checking whether thresh or blur]
             cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
             cv2.medianBlur(gray, 3)
 
@@ -228,7 +238,7 @@ def read_pdf():
             # print(result)
             # return str(result)
         else:
-            pdf = request.files['file']
+            pdf = request.files["file"]
             start_page = 1  # int(request.form["start_page"]) - 1
             end_page = 2  # int(request.form["end_page"]) - 1
             # return "text"
@@ -241,17 +251,17 @@ def read_pdf():
             # return "text"
             # Read the text from each page of the PDF file
             # return "text"
-            text = ''
+            text = ""
             bold_words = []
             # return "text"
-            for i in range(start_page, end_page+1):
+            for i in range(start_page, end_page + 1):
                 page = pdf_reader.pages[i]
                 page_text = page.extract_text()
                 text += page_text + "\n"
 
                 # Find bolded words in the page text
                 for word in page_text.split():
-                    if word.startswith('<b>') and word.endswith('</b>'):
+                    if word.startswith("<b>") and word.endswith("</b>"):
                         bold_words.append(word[3:-4])
 
             textbook = str(text)
@@ -260,6 +270,7 @@ def read_pdf():
     except Exception as e:
         print(e)
         return str(e)
-    
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
