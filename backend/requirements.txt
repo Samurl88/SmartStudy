@@ -9,4 +9,5 @@ gunicorn
 pytesseract
 python-dotenv
 langchain
-langchain[llms]
+langchain[all]
+pillow
