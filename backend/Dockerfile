@@ -9,7 +9,7 @@ RUN apt-get update && \
     apt-get -qq -y install libsm6 && \
     apt-get -qq -y install libxext6
 
-WORKDIR /backend
+WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt
